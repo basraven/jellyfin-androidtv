@@ -40,7 +40,7 @@ fun InAppScreensaver() {
 					screensaverViewModel.notifyInteraction(true)
 				}
 		) {
-			DreamHost()
+			// DreamHost()
 		}
 	}
 }
