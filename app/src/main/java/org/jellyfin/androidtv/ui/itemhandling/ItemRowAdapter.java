@@ -609,9 +609,6 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
             case StaticItems:
                 loadStaticItems();
                 break;
-            case StaticAudioQueueItems:
-                loadStaticAudioItems();
-                break;
             case Specials:
                 ItemRowAdapterHelperKt.retrieveSpecialFeatures(this, api.getValue(), mSpecialsQuery);
                 break;
@@ -643,7 +640,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
                 break;
             case Resume:
                 ItemRowAdapterHelperKt.retrieveResumeItems(this, api.getValue(), resumeQuery);
-            break;
+                break;
         }
     }
 
@@ -686,20 +683,6 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
         notifyRetrieveFinished();
     }
 
-    private void loadStaticAudioItems() {
-        if (mItems != null) {
-            for (org.jellyfin.sdk.model.api.BaseItemDto item : mItems) {
-                add(new AudioQueueBaseRowItem(item));
-            }
-            itemsLoaded = mItems.size();
-
-        } else {
-            removeRow();
-        }
-
-        notifyRetrieveFinished();
-    }
-
     private void addToParentIfResultsReceived() {
         if (itemsLoaded > 0 && mParent != null) {
             mParent.add(mRow);
@@ -719,6 +702,8 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
     }
 
     protected void notifyRetrieveFinished(@Nullable Exception exception) {
+        if (exception != null) Timber.w(exception, "Failed to retrieve items");
+
         setCurrentlyRetrieving(false);
         if (mRetrieveFinishedListener != null) {
             if (exception == null) mRetrieveFinishedListener.onResponse();

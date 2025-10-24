@@ -3,7 +3,7 @@
     <string name="video_error_unknown_error">加载视频失败</string>
     <string name="btn_cancel">取消</string>
     <string name="byletter_letters">ABCDEFGHIJKLMNOPQRSTUVWXYZ</string>
-    <string name="pref_playback">回放</string>
+    <string name="pref_playback">播放</string>
     <string name="pref_max_bitrate_title">最大串流码率</string>
     <string name="settings_title">偏好</string>
     <string name="chapters">章节</string>
@@ -24,7 +24,7 @@
     <string name="lbl_other_channels">其它频道</string>
     <string name="lbl_collections">合集</string>
     <string name="lbl_movies">电影</string>
-    <string name="lbl_tv_series">电视剧</string>
+    <string name="lbl_tv_series">电视节目</string>
     <string name="lbl_other">其它</string>
     <string name="lbl_play_all">全部播放</string>
     <string name="lbl_shuffle_all">随机播放</string>
@@ -49,7 +49,7 @@
     <string name="lbl_other_options">其它选项</string>
     <string name="lbl_people">人物</string>
     <string name="lbl_none">无</string>
-    <string name="msg_video_playback_error">"视频回放出错- "</string>
+    <string name="msg_video_playback_error">"视频播放出错- "</string>
     <string name="lbl_bracket_unknown">未知</string>
     <string name="lbl_trailer">"预告片 "</string>
     <string name="lbl_no">否</string>
@@ -59,7 +59,7 @@
     <string name="lbl_ok">确定</string>
     <string name="lbl_born">"生日 "</string>
     <string name="lbl_loading_elipses">正在载入…</string>
-    <string name="msg_playback_not_allowed">此时不能回放</string>
+    <string name="msg_playback_not_allowed">此时不能播放</string>
     <string name="msg_playback_restricted">现在管理员不允许播放此项目</string>
     <string name="msg_playback_incompatible">无法播放这个视频格式</string>
     <string name="lbl_never">从不</string>
@@ -110,7 +110,7 @@
     <string name="lbl_show_indicators">显示指标</string>
     <string name="lbl_sort_by">排序</string>
     <string name="lbl_premiere">首映</string>
-    <string name="lbl_guest_stars">访客评分</string>
+    <string name="lbl_guest_stars">客串明星</string>
     <string name="lbl_on_schedule">在计划上</string>
     <string name="lbl_at_any_time">随时</string>
     <string name="lbl_series_recordings">节目录制</string>
@@ -233,7 +233,7 @@
     <string name="pref_button_remapping_description">按电视遥控器上的任何按钮进行分配</string>
     <string name="pref_subtitle_track_button">字幕选择按键</string>
     <string name="pref_audio_track_button">音轨按键</string>
-    <string name="lbl_unknown_key">未知(%1s)</string>
+    <string name="lbl_unknown_key">未知 (%1s)</string>
     <string name="bitrate_kbit">%1$,.0f 千比特/秒</string>
     <string name="bitrate_mbit">%1$,.0f 兆比特/秒</string>
     <string name="no_player_message">你似乎没有安装可播放视频的应用。此选项需要您安装第三方应用来播放视频内容。</string>
@@ -499,14 +499,14 @@
         <item quantity="other">%1$s 电影</item>
     </plurals>
     <plurals name="songs">
-        <item quantity="other">%1$s歌曲</item>
+        <item quantity="other">%1$s 歌曲</item>
     </plurals>
     <plurals name="albums">
         <item quantity="other">%1$s 合集</item>
     </plurals>
     <string name="dolby_atmos">杜比全景声</string>
     <plurals name="tv_series">
-        <item quantity="other">%1$s 电视剧</item>
+        <item quantity="other">%1$s 电视节目</item>
     </plurals>
     <string name="clear_image_cache">清除图片缓存</string>
     <string name="dts_x">DTS:X</string>
@@ -518,7 +518,7 @@
     <string name="clear_image_cache_content">已使用：%1$s</string>
     <string name="random">随机</string>
     <string name="unreleased">尚未发布</string>
-    <string name="pref_playback_advanced">高级回放偏好</string>
+    <string name="pref_playback_advanced">高级播放偏好</string>
     <string name="lbl_home">首页</string>
     <string name="pref_screensaver_ageratingmax">最大年龄分级</string>
     <string name="pref_screensaver_ageratingmax_zero">所有年龄段</string>
@@ -562,4 +562,22 @@
     <string name="pref_report_device_profile_title">向服务器回报播放能力</string>
     <string name="pref_report_device_profile_summary">上传含有播放能力的疑难排解文件至伺服器</string>
     <string name="pref_report_device_profile_success">文件已提交为 %1$s</string>
+    <string name="indicator_subtitles_hearing_impaired">SDH</string>
+    <string name="fast_forward">快进</string>
+    <string name="rewind">快退</string>
+    <string name="preference_enable_libass">启用高级 SubStation Alpha 字幕客户端渲染</string>
+    <string name="speech_error_unavailable">您的设备无法使用语音识别。</string>
+    <string name="speech_error_no_permission">无权使用麦克风。请在系统设置中启用。</string>
+    <string name="lbl_from_beginning">从头开始播放</string>
+    <string name="speech_error_unknown">语音识别过程中出现意外错误。</string>
+    <string name="pref_subtitles_bold">粗体文本</string>
+    <string name="preference_enable_pgs">直接播放 PGS 字幕</string>
+    <string name="lbl_exit">退出</string>
+    <string name="pref_still_watching_behavior_title">显示不活动超时弹出窗口</string>
+    <string name="lbl_still_watching_default">3集或90分钟</string>
+    <string name="lbl_still_watching_short">2集或60分钟</string>
+    <string name="lbl_still_watching_long">5集或150分钟</string>
+    <string name="lbl_still_watching_very_long">8集或240分钟</string>
+    <string name="still_watching_label">你还在看吗？</string>
+    <string name="pref_subtitles_position">从底部偏移</string>
 </resources>

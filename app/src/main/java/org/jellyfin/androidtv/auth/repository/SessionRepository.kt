@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.auth.repository
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -7,6 +8,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.jellyfin.androidtv.auth.model.Server
 import org.jellyfin.androidtv.auth.store.AuthenticationPreferences
 import org.jellyfin.androidtv.auth.store.AuthenticationStore
 import org.jellyfin.androidtv.preference.PreferencesRepository
@@ -110,12 +112,15 @@ class SessionRepositoryImpl(
 	override fun destroyCurrentSession() {
 		Timber.i("Destroying current session")
 
-		userRepository.updateCurrentUser(null)
+		userRepository.setCurrentUser(null)
+		serverRepository.setCurrentServer(null)
 		_currentSession.value = null
 		_state.value = SessionRepositoryState.READY
 	}
 
 	private suspend fun setCurrentSession(session: Session?): Boolean {
+		var server: Server? = null
+
 		if (session != null) {
 			// No change in session - don't switch
 			if (currentSession.value?.userId == session.userId) return true
@@ -125,19 +130,22 @@ class SessionRepositoryImpl(
 			authenticationPreferences[AuthenticationPreferences.lastUserId] = session.userId.toString()
 
 			// Check if server version is supported
-			val server = serverRepository.getServer(session.serverId)
+			server = serverRepository.getServer(session.serverId, true)
 			if (server == null || !server.versionSupported) return false
 		}
 
 		// Update session after binding the apiclient settings
 		val deviceInfo = session?.let { defaultDeviceInfo.forUser(it.userId) } ?: defaultDeviceInfo
-		Timber.i("Updating current session. userId=${session?.userId}")
+		Timber.i("Updating current session. userId=${session?.userId} server=${server?.serverVersion}")
 
 		val applied = userApiClient.applySession(session, deviceInfo)
 		if (applied && session != null) {
 			try {
-				val user by userApiClient.userApi.getCurrentUser()
-				userRepository.updateCurrentUser(user)
+				val user = withContext(Dispatchers.IO) {
+					userApiClient.userApi.getCurrentUser().content
+				}
+				userRepository.setCurrentUser(user)
+				serverRepository.setCurrentServer(server)
 			} catch (err: ApiClientException) {
 				Timber.e(err, "Unable to authenticate: bad response when getting user info")
 				destroyCurrentSession()
@@ -149,7 +157,8 @@ class SessionRepositoryImpl(
 			telemetryPreferences[TelemetryPreferences.crashReportUrl] = crashReportUrl
 			telemetryPreferences[TelemetryPreferences.crashReportToken] = session.accessToken
 		} else {
-			userRepository.updateCurrentUser(null)
+			userRepository.setCurrentUser(null)
+			serverRepository.setCurrentServer(null)
 		}
 		preferencesRepository.onSessionChanged()
 		_currentSession.value = session

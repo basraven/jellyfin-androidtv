@@ -248,7 +248,7 @@
     <string name="player_error">Afspilningsfejl. Prøver igen…</string>
     <string name="seek_error">Kan ikke søge</string>
     <string name="msg_live_tv_prev">Indlæs forrige %1$d timer?</string>
-    <string name="msg_live_tv_next">Indlæs næste %1$d timer\?</string>
+    <string name="msg_live_tv_next">Indlæs næste %1$d timer?</string>
     <string name="lbl_load_guide_data">Indlæs guidedata</string>
     <string name="episode_missing_message_2">Dette afsnit mangler fra dit bibliotek. Afspilningen stopper.</string>
     <string name="episode_missing_message">Dette afsnit mangler fra dit bibliotek. Vil du springe det over og fortsætte til det næste?</string>
@@ -514,7 +514,7 @@
     </plurals>
     <plurals name="movies">
         <item quantity="one">%1$s film</item>
-        <item quantity="other"/>
+        <item quantity="other">%1$s film</item>
     </plurals>
     <plurals name="albums">
         <item quantity="one">%1$s album</item>
@@ -564,4 +564,30 @@
     <string name="segment_type_unknown">Ukendte segmenter</string>
     <string name="skip_forward_length">Længde der spoles frem med</string>
     <string name="preference_enable_trickplay">Slå trickplay til i videoafspiller</string>
+    <string name="fast_forward">Spol frem</string>
+    <string name="rewind">Spol tilbage</string>
+    <string name="preference_enable_pgs">Direkte afspilning af PGS-undertekster</string>
+    <string name="pref_subtitles_bold">Fed tekst</string>
+    <string name="lbl_from_beginning">Afspil fra begyndelsen</string>
+    <string name="pref_report_device_profile_summary">Upload et fejlsøgningsdokument til Jellyfin-serveren med information om afspilningsmuligheder</string>
+    <string name="pref_troubleshooting">Fejlsøgning</string>
+    <string name="runtime_hours_minutes">%1$dt %2$dm</string>
+    <string name="runtime_minutes">%1$dm</string>
+    <string name="lbl_exit">Afslut</string>
+    <string name="pref_still_watching_behavior_title">Vis pop op-vindue ved inaktivitet</string>
+    <string name="lbl_still_watching_default">3 afsnit eller 90 minutter</string>
+    <string name="lbl_still_watching_short">2 afsnit eller 60 minutter</string>
+    <string name="lbl_still_watching_long">5 afsnit eller 150 minutter</string>
+    <string name="lbl_still_watching_very_long">8 afsnit eller 240 minutter</string>
+    <string name="pref_subtitles_background_opacity">Ugennemsigtighed af undertekstbaggrund</string>
+    <string name="still_watching_label">Kigger du stadig med?</string>
+    <string name="preference_enable_libass">Aktiver Advanced SubStation Alpha-undertekster på klienten</string>
+    <string name="speech_error_no_permission">Ingen tilladelse til at bruge mikrofonen. Tillad det venligst i systemindstillingerne.</string>
+    <string name="speech_error_unavailable">Talegenkendelse er ikke tilgængelig på din enhed.</string>
+    <string name="speech_error_unknown">En uventet fejl opstod under talegenkendelse.</string>
+    <string name="indicator_subtitles_hearing_impaired">Tekstet for hørehæmmede</string>
+    <string name="pref_report_device_profile_title">Rapporter afspilningsmuligheder til server</string>
+    <string name="pref_report_device_profile_success">Dokument indsendt som %1$s</string>
+    <string name="pref_report_device_profile_failure">Det lykkedes ikke at sende dokumentet. Din Jellyfin-server tillader måske ikke indsendelse af klientlogge.</string>
+    <string name="pref_subtitles_position">Afstand fra bunden</string>
 </resources>

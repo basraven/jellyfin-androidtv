@@ -18,7 +18,6 @@ android {
 		applicationId = namespace
 		versionName = project.getVersionName()
 		versionCode = getVersionCode(versionName!!)
-		setProperty("archivesBaseName", "jellyfin-androidtv-v$versionName")
 	}
 
 	buildFeatures {
@@ -32,7 +31,7 @@ android {
 	}
 
 	buildTypes {
-		val release by getting {
+		release {
 			isMinifyEnabled = false
 
 			// Set package names used in various XML files
@@ -46,7 +45,7 @@ android {
 			buildConfigField("boolean", "DEVELOPMENT", "false")
 		}
 
-		val debug by getting {
+		debug {
 			// Use different application id to run release and debug at the same time
 			applicationIdSuffix = ".debug"
 
@@ -74,7 +73,9 @@ android {
 	}
 }
 
-val versionTxt by tasks.registering {
+base.archivesName.set("jellyfin-androidtv-v${project.getVersionName()}")
+
+tasks.register("versionTxt") {
 	val path = layout.buildDirectory.asFile.get().resolve("version.txt")
 
 	doLast {
@@ -108,6 +109,7 @@ dependencies {
 	// Android(x)
 	implementation(libs.androidx.core)
 	implementation(libs.androidx.activity)
+	implementation(libs.androidx.activity.compose)
 	implementation(libs.androidx.fragment)
 	implementation(libs.androidx.fragment.compose)
 	implementation(libs.androidx.leanback.core)
@@ -123,13 +125,14 @@ dependencies {
 	implementation(libs.androidx.cardview)
 	implementation(libs.androidx.startup)
 	implementation(libs.bundles.androidx.compose)
-	implementation(libs.androidx.tv.material)
+	implementation(libs.accompanist.permissions)
 
 	// Dependency Injection
 	implementation(libs.bundles.koin)
 
 	// Media players
 	implementation(libs.androidx.media3.exoplayer)
+	implementation(libs.androidx.media3.datasource.okhttp)
 	implementation(libs.androidx.media3.exoplayer.hls)
 	implementation(libs.androidx.media3.ui)
 	implementation(libs.jellyfin.androidx.media3.ffmpeg.decoder)

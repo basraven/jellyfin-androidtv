@@ -26,6 +26,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import androidx.fragment.app.Fragment;
 import androidx.leanback.app.RowsSupportFragment;
 import androidx.leanback.widget.ArrayObjectAdapter;
@@ -218,8 +219,10 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
             return;
         }
 
-        if (playbackControllerContainer.getValue().getPlaybackController() != null) {
-            playbackControllerContainer.getValue().getPlaybackController().init(new VideoManager((requireActivity()), view, helper), this);
+        PlaybackController playbackController = playbackControllerContainer.getValue().getPlaybackController();
+
+        if (playbackController != null) {
+            playbackController.init(new VideoManager(requireActivity(), view, helper), this);
         }
     }
 
@@ -240,10 +243,10 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         prepareOverlayFragment();
 
         //pre-load animations
-        fadeOut = AnimationUtils.loadAnimation(requireContext(), androidx.leanback.R.anim.abc_fade_out);
+        fadeOut = AnimationUtils.loadAnimation(requireContext(), R.anim.fade_out);
         fadeOut.setAnimationListener(hideAnimationListener);
-        slideDown = AnimationUtils.loadAnimation(requireContext(), androidx.leanback.R.anim.abc_slide_in_top);
-        slideUp = AnimationUtils.loadAnimation(requireContext(), androidx.leanback.R.anim.abc_slide_in_bottom);
+        slideDown = AnimationUtils.loadAnimation(requireContext(), R.anim.slide_top_in);
+        slideUp = AnimationUtils.loadAnimation(requireContext(), R.anim.slide_bottom_in);
         slideDown.setAnimationListener(showAnimationListener);
         setupPopupAnimations();
 
@@ -318,7 +321,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     }
 
     private void setupPopupAnimations() {
-        showPopup = AnimationUtils.loadAnimation(requireContext(), androidx.leanback.R.anim.abc_slide_in_bottom);
+        showPopup = AnimationUtils.loadAnimation(requireContext(), R.anim.slide_bottom_in);
         showPopup.setAnimationListener(new Animation.AnimationListener() {
             @Override
             public void onAnimationStart(Animation animation) {
@@ -334,7 +337,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
             public void onAnimationRepeat(Animation animation) {
             }
         });
-        hidePopup = AnimationUtils.loadAnimation(requireContext(), androidx.leanback.R.anim.abc_fade_out);
+        hidePopup = AnimationUtils.loadAnimation(requireContext(), R.anim.fade_out);
         hidePopup.setAnimationListener(new Animation.AnimationListener() {
             @Override
             public void onAnimationStart(Animation animation) {
@@ -436,21 +439,25 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
                 return false;
             }
 
-            if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY) {
-                playbackControllerContainer.getValue().getPlaybackController().play(0);
-                return true;
-            } else if (keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE) {
-                playbackControllerContainer.getValue().getPlaybackController().pause();
-                return true;
-            } else if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
-                playbackControllerContainer.getValue().getPlaybackController().playPause();
-                return true;
-            } else if (keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_BUTTON_R1 || keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
-                playbackControllerContainer.getValue().getPlaybackController().fastForward();
-                return true;
-            } else if (keyCode == KeyEvent.KEYCODE_MEDIA_REWIND || keyCode == KeyEvent.KEYCODE_BUTTON_L1 || keyCode == KeyEvent.KEYCODE_BUTTON_L2) {
-                playbackControllerContainer.getValue().getPlaybackController().rewind();
-                return true;
+            PlaybackController playbackController = playbackControllerContainer.getValue().getPlaybackController();
+
+            if (playbackController != null) {
+                if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY) {
+                    playbackController.play(0);
+                    return true;
+                } else if (keyCode == KeyEvent.KEYCODE_MEDIA_PAUSE) {
+                    playbackController.pause();
+                    return true;
+                } else if (keyCode == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
+                    playbackController.playPause();
+                    return true;
+                } else if (keyCode == KeyEvent.KEYCODE_MEDIA_FAST_FORWARD || keyCode == KeyEvent.KEYCODE_BUTTON_R1 || keyCode == KeyEvent.KEYCODE_BUTTON_R2) {
+                    playbackController.fastForward();
+                    return true;
+                } else if (keyCode == KeyEvent.KEYCODE_MEDIA_REWIND || keyCode == KeyEvent.KEYCODE_BUTTON_L1 || keyCode == KeyEvent.KEYCODE_BUTTON_L2) {
+                    playbackController.rewind();
+                    return true;
+                }
             }
         }
 
@@ -479,7 +486,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
                 if (binding.skipOverlay.getVisible()) {
                     // Hide without doing anything
                     if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_BUTTON_B || keyCode == KeyEvent.KEYCODE_ESCAPE) {
-                        binding.skipOverlay.setTargetPositionMs(null);
+                        clearSkipOverlay();
                         return true;
                     }
 
@@ -487,7 +494,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
                     if (keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER) {
                         playbackControllerContainer.getValue().getPlaybackController().seek(binding.skipOverlay.getTargetPositionMs(), true);
                         leanbackOverlayFragment.setShouldShowOverlay(false);
-                        if (binding != null) binding.skipOverlay.setTargetPositionMs(null);
+                        if (binding != null) clearSkipOverlay();
                         return true;
                     }
                 }
@@ -647,6 +654,8 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         mFadeEnabled = true;
         mHandler.removeCallbacks(mHideTask);
         mHandler.postDelayed(mHideTask, 6000);
+        WindowCompat.setDecorFitsSystemWindows(requireActivity().getWindow(), false);
+        WindowCompat.getInsetsController(requireActivity().getWindow(), requireActivity().getWindow().getDecorView()).hide(WindowInsetsCompat.Type.systemBars());
     }
 
     @Override
@@ -654,8 +663,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         super.onResume();
 
         // Close player when resuming without a valid playback controller
-        PlaybackController playbackController = playbackControllerContainer.getValue().getPlaybackController();
-        if (playbackController == null || !playbackController.hasFragment()) {
+        if (playbackControllerContainer.getValue().getPlaybackController() == null || !playbackControllerContainer.getValue().getPlaybackController().hasFragment()) {
             closePlayer();
 
             return;
@@ -663,7 +671,11 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
 
         // Hide system bars
         WindowCompat.setDecorFitsSystemWindows(requireActivity().getWindow(), false);
-        WindowCompat.getInsetsController(requireActivity().getWindow(), requireActivity().getWindow().getDecorView()).hide(WindowInsetsCompat.Type.systemBars());
+        WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(requireActivity().getWindow(), requireActivity().getWindow().getDecorView());
+        insetsController.hide(WindowInsetsCompat.Type.systemBars());
+        insetsController.setSystemBarsBehavior(
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        );
 
         if (mAudioManager.requestAudioFocus(mAudioFocusChanged, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
             Timber.e("Unable to get audio focus");
@@ -796,9 +808,10 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         tvGuideBinding.channelsStatus.setText("");
         tvGuideBinding.filterStatus.setText("");
         final CustomPlaybackOverlayFragment self = this;
-        TvManager.getProgramsAsync(this, mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx, mCurrentGuideStart, mCurrentGuideEnd, new EmptyResponse() {
+        TvManager.getProgramsAsync(this, mCurrentDisplayChannelStartNdx, mCurrentDisplayChannelEndNdx, mCurrentGuideStart, mCurrentGuideEnd, new EmptyResponse(getLifecycle()) {
             @Override
             public void onResponse() {
+                if (!isActive()) return;
                 Timber.d("*** Programs response");
                 if (mDisplayProgramsTask != null) mDisplayProgramsTask.cancel(true);
                 mDisplayProgramsTask = new DisplayProgramsTask(self);
@@ -1075,9 +1088,10 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     public void showProgramOptions() {
         if (mSelectedProgram == null) return;
         if (mDetailPopup == null)
-            mDetailPopup = new LiveProgramDetailPopup(requireActivity(), this, this, Utils.convertDpToPixel(requireContext(), 600), new EmptyResponse() {
+            mDetailPopup = new LiveProgramDetailPopup(requireActivity(), this, this, Utils.convertDpToPixel(requireContext(), 600), new EmptyResponse(getLifecycle()) {
                 @Override
                 public void onResponse() {
+                    if (!isActive()) return;
                     switchChannel(mSelectedProgram.getChannelId());
                 }
             });
@@ -1240,7 +1254,7 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
                 binding.itemTitle.setText(current.getName());
             }
             // Update the logo
-            String imageUrl = imageHelper.getValue().getLogoImageUrl(current, 440, false);
+            String imageUrl = imageHelper.getValue().getLogoImageUrl(current, 440);
             if (imageUrl != null) {
                 binding.itemLogo.setVisibility(View.VISIBLE);
                 binding.itemTitle.setVisibility(View.GONE);
@@ -1257,6 +1271,10 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
                 prepareChapterAdapter();
             }
         }
+    }
+
+    public void clearSkipOverlay() {
+        binding.skipOverlay.setTargetPositionMs(null);
     }
 
     private void prepareChapterAdapter() {
@@ -1277,8 +1295,10 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
     private void prepareChannelAdapter() {
         // create quick channel change row
         TvManager.loadAllChannels(this, response -> {
+            List<BaseItemDto> channels = TvManager.getAllChannels();
+            if (channels == null) return null;
             ArrayObjectAdapter channelAdapter = new ArrayObjectAdapter(new ChannelCardPresenter());
-            channelAdapter.addAll(0, TvManager.getAllChannels());
+            channelAdapter.addAll(0, channels);
             if (mChapterRow != null) mPopupRowAdapter.remove(mChapterRow);
             mChapterRow = new ListRow(new HeaderItem(requireContext().getString(R.string.channels)), channelAdapter);
             mPopupRowAdapter.add(mChapterRow);
@@ -1302,6 +1322,13 @@ public class CustomPlaybackOverlayFragment extends Fragment implements LiveTvGui
         navigating = true;
 
         navigationRepository.getValue().navigate(Destinations.INSTANCE.nextUp(id), true);
+    }
+
+    public void showStillWatching(@NonNull UUID id) {
+        if (navigating) return;
+        navigating = true;
+
+        navigationRepository.getValue().navigate(Destinations.INSTANCE.stillWatching(id), true);
     }
 
     @Override

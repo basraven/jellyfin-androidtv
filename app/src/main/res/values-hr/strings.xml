@@ -158,8 +158,8 @@
     <string name="too_many_errors">Previše grešaka. Odustajem</string>
     <string name="player_error">Greška u izvođaču. Pokušat ću ponovno…</string>
     <string name="seek_error">Nije moguće pretraživati</string>
-    <string name="msg_live_tv_prev">Učitaj prethodnih %1$d sati\?</string>
-    <string name="msg_live_tv_next">Učitaj sljedećih %1$d sati\?</string>
+    <string name="msg_live_tv_prev">Učitaj prethodnih %1$d sati?</string>
+    <string name="msg_live_tv_next">Učitaj sljedećih %1$d sati?</string>
     <string name="lbl_load_guide_data">Učitaj podatke TV rasporeda</string>
     <string name="episode_missing_message_2">Ova epizoda nedostaje u vašoj biblioteci. Reprodukcija će stati.</string>
     <string name="episode_missing_message">Ova epizoda nedostaje u vašoj biblioteci. Želite li ju preskočiti i nastaviti s idućom\?</string>
@@ -573,4 +573,13 @@
     <string name="pref_screensaver_ageratingmax">Najviša dobna skupina</string>
     <string name="pref_screensaver_ageratingrequired_disabled">Prikaži sve sadržaje</string>
     <string name="preference_enable_trickplay">Omogući trickplay u video playeru</string>
+    <string name="lbl_exit">Izlaz</string>
+    <string name="runtime_hours_minutes">%1$dh %2$dm</string>
+    <string name="runtime_minutes">%1$dm</string>
+    <string name="lbl_from_beginning">Reproduciraj od početka</string>
+    <string name="pref_subtitles_bold">Podebljani tekst</string>
+    <string name="indicator_subtitles_hearing_impaired">SDH</string>
+    <string name="lbl_still_watching_long">5 epizoda ili 150 minuta</string>
+    <string name="lbl_still_watching_very_long">8 epizoda ili 240 minuta</string>
+    <string name="pref_subtitles_position">Pomak od dna</string>
 </resources>

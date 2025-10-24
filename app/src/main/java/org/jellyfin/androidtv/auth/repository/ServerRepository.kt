@@ -1,11 +1,14 @@
 package org.jellyfin.androidtv.auth.repository
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.auth.model.AuthenticationStoreServer
 import org.jellyfin.androidtv.auth.model.ConnectedState
 import org.jellyfin.androidtv.auth.model.ConnectingState
@@ -23,12 +26,12 @@ import org.jellyfin.sdk.api.client.extensions.systemApi
 import org.jellyfin.sdk.discovery.RecommendedServerInfo
 import org.jellyfin.sdk.discovery.RecommendedServerInfoScore
 import org.jellyfin.sdk.model.ServerVersion
-import org.jellyfin.sdk.model.api.BrandingOptions
 import org.jellyfin.sdk.model.api.ServerDiscoveryInfo
 import org.jellyfin.sdk.model.serializer.toUUID
 import timber.log.Timber
 import java.time.Instant
 import java.util.UUID
+import org.jellyfin.sdk.model.api.BrandingOptions as BrandingOptionsDto
 
 /**
  * Repository to maintain servers.
@@ -36,13 +39,16 @@ import java.util.UUID
 interface ServerRepository {
 	val storedServers: StateFlow<List<Server>>
 	val discoveredServers: StateFlow<List<Server>>
+	val currentServer: StateFlow<Server?>
 
 	suspend fun loadStoredServers()
 	suspend fun loadDiscoveryServers()
 
+	fun setCurrentServer(server: Server?)
+
 	fun addServer(address: String): Flow<ServerAdditionState>
-	suspend fun getServer(id: UUID): Server?
-	suspend fun updateServer(server: Server): Boolean
+	suspend fun getServer(id: UUID, eagerUpdate: Boolean = false): Server?
+	suspend fun updateServer(server: Server, force: Boolean = false): Boolean
 	suspend fun deleteServer(server: UUID): Boolean
 
 	companion object {
@@ -64,6 +70,9 @@ class ServerRepositoryImpl(
 	private val _discoveredServers = MutableStateFlow(emptyList<Server>())
 	override val discoveredServers = _discoveredServers.asStateFlow()
 
+	private val _currentServer = MutableStateFlow<Server?>(null)
+	override val currentServer = _currentServer.asStateFlow()
+
 	// Loading data
 	override suspend fun loadStoredServers() {
 		authenticationStore.getServers()
@@ -84,6 +93,10 @@ class ServerRepositoryImpl(
 			}
 	}
 
+	override fun setCurrentServer(server: Server?) {
+		_currentServer.value = server
+	}
+
 	// Mutating data
 	override fun addServer(address: String): Flow<ServerAdditionState> = flow {
 		Timber.i("Adding server %s", address)
@@ -102,6 +115,7 @@ class ServerRepositoryImpl(
 					goodRecommendations += recommendedServer
 					false
 				}
+
 				else -> {
 					badRecommendations += recommendedServer
 					false
@@ -159,13 +173,17 @@ class ServerRepositoryImpl(
 				.mapValues { (_, entry) -> entry.flatMap { server -> server.issues } }
 			emit(UnableToConnectState(addressCandidatesWithIssues))
 		}
-	}
+	}.flowOn(Dispatchers.IO)
 
-	override suspend fun getServer(id: UUID): Server? {
+	override suspend fun getServer(id: UUID, eagerUpdate: Boolean): Server? {
 		val server = authenticationStore.getServer(id) ?: return null
 
 		val updatedServer = try {
-			updateServerInternal(id, server)
+			val forceUpdate = eagerUpdate && server.version
+				?.let(ServerVersion::fromString)
+				?.let { version -> version < ServerRepository.minimumServerVersion } == true
+
+			updateServerInternal(id, server, forceUpdate)
 		} catch (err: ApiClientException) {
 			Timber.e(err, "Unable to update server")
 			null
@@ -174,12 +192,12 @@ class ServerRepositoryImpl(
 		return (updatedServer ?: server).asServer(id)
 	}
 
-	override suspend fun updateServer(server: Server): Boolean {
+	override suspend fun updateServer(server: Server, force: Boolean): Boolean {
 		// Only update existing servers
 		val serverInfo = authenticationStore.getServer(server.id) ?: return false
 
 		return try {
-			updateServerInternal(server.id, serverInfo) != null
+			updateServerInternal(server.id, serverInfo, force) != null
 		} catch (err: ApiClientException) {
 			Timber.e(err, "Unable to update server")
 
@@ -187,25 +205,32 @@ class ServerRepositoryImpl(
 		}
 	}
 
-	private suspend fun updateServerInternal(id: UUID, server: AuthenticationStoreServer): AuthenticationStoreServer? {
+	private suspend fun updateServerInternal(
+		id: UUID,
+		server: AuthenticationStoreServer,
+		forceUpdate: Boolean
+	): AuthenticationStoreServer? {
 		val now = Instant.now().toEpochMilli()
 
 		// Only update every 10 minutes
-		if (now - server.lastRefreshed < 600000 && server.version != null) return null
+		if (now - server.lastRefreshed < 600000 && server.version != null && !forceUpdate) return null
 
-		val api = jellyfin.createApi(server.address)
-		// Get login disclaimer
-		val branding = api.getBrandingOptionsOrDefault()
-		val systemInfo by api.systemApi.getPublicSystemInfo()
+		val newServer = withContext(Dispatchers.IO) {
+			val api = jellyfin.createApi(server.address)
 
-		val newServer = server.copy(
-			name = systemInfo.serverName ?: server.name,
-			version = systemInfo.version ?: server.version,
-			loginDisclaimer = branding.loginDisclaimer ?: server.loginDisclaimer,
-			splashscreenEnabled = branding.splashscreenEnabled,
-			setupCompleted = systemInfo.startupWizardCompleted ?: server.setupCompleted,
-			lastRefreshed = now
-		)
+			// Get login disclaimer
+			val branding = api.getBrandingOptionsOrDefault()
+			val systemInfo by api.systemApi.getPublicSystemInfo()
+
+			server.copy(
+				name = systemInfo.serverName ?: server.name,
+				version = systemInfo.version ?: server.version,
+				loginDisclaimer = branding.loginDisclaimer ?: server.loginDisclaimer,
+				splashscreenEnabled = branding.splashscreenEnabled,
+				setupCompleted = systemInfo.startupWizardCompleted ?: server.setupCompleted,
+				lastRefreshed = now
+			)
+		}
 		authenticationStore.putServer(id, newServer)
 
 		return newServer
@@ -237,7 +262,7 @@ class ServerRepositoryImpl(
 		brandingApi.getBrandingOptions().content
 	} catch (exception: InvalidContentException) {
 		Timber.w(exception, "Invalid branding options response, using default value")
-		BrandingOptions(
+		BrandingOptionsDto(
 			loginDisclaimer = null,
 			customCss = null,
 			splashscreenEnabled = false,

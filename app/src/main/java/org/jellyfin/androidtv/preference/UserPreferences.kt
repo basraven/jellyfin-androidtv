@@ -3,12 +3,14 @@ package org.jellyfin.androidtv.preference
 import android.content.Context
 import android.view.KeyEvent
 import androidx.preference.PreferenceManager
+import org.jellyfin.androidtv.preference.UserPreferences.Companion.screensaverInAppEnabled
 import org.jellyfin.androidtv.preference.constant.AppTheme
 import org.jellyfin.androidtv.preference.constant.AudioBehavior
 import org.jellyfin.androidtv.preference.constant.ClockBehavior
 import org.jellyfin.androidtv.preference.constant.NextUpBehavior
 import org.jellyfin.androidtv.preference.constant.RatingType
 import org.jellyfin.androidtv.preference.constant.RefreshRateSwitchingBehavior
+import org.jellyfin.androidtv.preference.constant.StillWatchingBehavior
 import org.jellyfin.androidtv.preference.constant.WatchedIndicatorBehavior
 import org.jellyfin.androidtv.preference.constant.ZoomMode
 import org.jellyfin.androidtv.ui.playback.segment.MediaSegmentAction
@@ -85,6 +87,11 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		 * Enable cinema mode
 		 */
 		var cinemaModeEnabled = booleanPreference("pref_enable_cinema_mode", true)
+
+		/**
+		 * Enable still watching
+		 */
+		var stillWatchingBehavior = enumPreference("enable_still_watching", StillWatchingBehavior.DISABLED)
 
 		/* Playback - Video */
 		/**
@@ -171,6 +178,11 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		var subtitlesBackgroundColor = longPreference("subtitles_background_color", 0x00FFFFFF)
 
 		/**
+		 * Subtitles bold text
+		 */
+		var subtitlesTextWeight = intPreference("subtitles_text_weight", 400)
+
+		/**
 		 * Subtitles foreground color
 		 */
 		var subtitlesTextColor = longPreference("subtitles_text_color", 0xFFFFFFFF)
@@ -184,6 +196,11 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		 * Subtitles font size
 		 */
 		var subtitlesTextSize = floatPreference("subtitles_text_size", 1f)
+
+		/**
+		 * Subtitles offset
+		 */
+		var subtitlesOffsetPosition = floatPreference("subtitles_offset_position", 0.08f)
 
 		/**
 		 * Show screensaver in app
@@ -230,6 +247,11 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		 * Enable TrickPlay in legacy player user interface while seeking.
 		 */
 		var trickPlayEnabled = booleanPreference("trick_play_enabled", false)
+
+		/**
+  		 * Enable PGS subtitle direct-play.
+		 */
+		var pgsDirectPlay = booleanPreference("pgs_enabled", true)
 	}
 
 	init {

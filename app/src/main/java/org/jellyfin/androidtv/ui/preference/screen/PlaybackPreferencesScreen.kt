@@ -8,6 +8,7 @@ import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.preference.constant.AudioBehavior
 import org.jellyfin.androidtv.preference.constant.NEXTUP_TIMER_DISABLED
 import org.jellyfin.androidtv.preference.constant.NextUpBehavior
+import org.jellyfin.androidtv.preference.constant.StillWatchingBehavior
 import org.jellyfin.androidtv.ui.playback.segment.MediaSegmentAction
 import org.jellyfin.androidtv.ui.playback.segment.MediaSegmentRepository
 import org.jellyfin.androidtv.ui.preference.custom.DurationSeekBarPreference
@@ -61,6 +62,12 @@ class PlaybackPreferencesScreen : OptionsFragment() {
 					userPreferences[UserPreferences.mediaQueuingEnabled]
 						&& userPreferences[UserPreferences.nextUpBehavior] != NextUpBehavior.DISABLED
 				}
+			}
+
+			enum<StillWatchingBehavior> {
+				setTitle(R.string.pref_still_watching_behavior_title)
+				bind(userPreferences, UserPreferences.stillWatchingBehavior)
+				depends { userPreferences[UserPreferences.mediaQueuingEnabled] }
 			}
 
 			checkbox {
@@ -209,7 +216,7 @@ class PlaybackPreferencesScreen : OptionsFragment() {
 				setTitle(R.string.pref_subtitles_size)
 				min = 25 // 0.25f
 				max = 250 // 2.5f
-				increment = 25 // 0.25f
+				increment = 5 // 0.05f
 				valueFormatter = object : DurationSeekBarPreference.ValueFormatter() {
 					override fun display(value: Int): String = "$value%"
 				}
@@ -218,6 +225,34 @@ class PlaybackPreferencesScreen : OptionsFragment() {
 					get { (userPreferences[UserPreferences.subtitlesTextSize] * 100f).roundToInt() }
 					set { value -> userPreferences[UserPreferences.subtitlesTextSize] = value / 100f }
 					default { (UserPreferences.subtitlesTextSize.defaultValue * 100f).roundToInt() }
+				}
+			}
+
+			@Suppress("MagicNumber")
+			seekbar {
+				setTitle(R.string.pref_subtitles_position)
+				min = 0 // 0.0f
+				max = 80 // 0.8f
+				increment = 1 // 0.01f
+				valueFormatter = object : DurationSeekBarPreference.ValueFormatter() {
+					override fun display(value: Int): String = "$value%"
+				}
+
+				bind {
+					get { (userPreferences[UserPreferences.subtitlesOffsetPosition] * 100f).roundToInt() }
+					set { value -> userPreferences[UserPreferences.subtitlesOffsetPosition] = value / 100f }
+					default { (UserPreferences.subtitlesOffsetPosition.defaultValue * 100f).roundToInt() }
+				}
+			}
+
+			checkbox {
+				setTitle(R.string.pref_subtitles_bold)
+				bind {
+					val boldWeight = 700
+					val normalWeight = UserPreferences.subtitlesTextWeight.defaultValue
+					get { userPreferences[UserPreferences.subtitlesTextWeight] == boldWeight }
+					set { checked -> userPreferences[UserPreferences.subtitlesTextWeight] = if (checked) boldWeight else normalWeight }
+					default { false }
 				}
 			}
 		}

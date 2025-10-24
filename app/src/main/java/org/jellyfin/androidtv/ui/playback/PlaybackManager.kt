@@ -2,7 +2,9 @@ package org.jellyfin.androidtv.ui.playback
 
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.data.compat.PlaybackException
 import org.jellyfin.androidtv.data.compat.StreamInfo
 import org.jellyfin.androidtv.data.compat.VideoOptions
@@ -34,12 +36,15 @@ private fun createStreamInfo(
 	if (options.enableDirectPlay && source.supportsDirectPlay) {
 		playMethod = PlayMethod.DIRECT_PLAY
 		container = source.container
-		mediaUrl = api.videosApi.getVideoStreamUrl(
-			itemId = itemId,
-			mediaSourceId = source.id,
-			static = true,
-			tag = source.eTag,
-		)
+		mediaUrl = when {
+			source.isRemote && source.path != null -> source.path
+			else -> api.videosApi.getVideoStreamUrl(
+				itemId = itemId,
+				mediaSourceId = source.id,
+				static = true,
+				tag = source.eTag,
+			)
+		}
 	} else if (options.enableDirectStream && source.supportsDirectStream) {
 		playMethod = PlayMethod.DIRECT_STREAM
 		container = source.transcodingContainer
@@ -74,7 +79,9 @@ class PlaybackManager(
 		callback: Response<StreamInfo>
 	) = lifecycleOwner.lifecycleScope.launch {
 		if (stream.playSessionId != null && stream.playMethod != PlayMethod.DIRECT_PLAY) {
-			api.hlsSegmentApi.stopEncodingProcess(api.deviceInfo.id, stream.playSessionId)
+			withContext(Dispatchers.IO) {
+				api.hlsSegmentApi.stopEncodingProcess(api.deviceInfo.id, stream.playSessionId)
+			}
 		}
 
 		getVideoStreamInfoInternal(options, startTimeTicks).fold(
@@ -87,22 +94,24 @@ class PlaybackManager(
 		options: VideoOptions,
 		startTimeTicks: Long
 	) = runCatching {
-		val response by api.mediaInfoApi.getPostedPlaybackInfo(
-			itemId = requireNotNull(options.itemId) { "Item id cannot be null" },
-			data = PlaybackInfoDto(
-				mediaSourceId = options.mediaSourceId,
-				startTimeTicks = startTimeTicks,
-				deviceProfile = options.profile,
-				enableDirectStream = options.enableDirectStream,
-				enableDirectPlay = options.enableDirectPlay,
-				maxAudioChannels = options.maxAudioChannels,
-				audioStreamIndex = options.audioStreamIndex.takeIf { it != null && it >= 0 },
-				subtitleStreamIndex = options.subtitleStreamIndex,
-				allowVideoStreamCopy = true,
-				allowAudioStreamCopy = true,
-				autoOpenLiveStream = true,
-			)
-		)
+		val response = withContext(Dispatchers.IO) {
+			api.mediaInfoApi.getPostedPlaybackInfo(
+				itemId = requireNotNull(options.itemId) { "Item id cannot be null" },
+				data = PlaybackInfoDto(
+					mediaSourceId = options.mediaSourceId,
+					startTimeTicks = startTimeTicks,
+					deviceProfile = options.profile,
+					enableDirectStream = options.enableDirectStream,
+					enableDirectPlay = options.enableDirectPlay,
+					maxAudioChannels = options.maxAudioChannels,
+					audioStreamIndex = options.audioStreamIndex.takeIf { it != null && it >= 0 },
+					subtitleStreamIndex = options.subtitleStreamIndex,
+					allowVideoStreamCopy = true,
+					allowAudioStreamCopy = true,
+					autoOpenLiveStream = true,
+				)
+			).content
+		}
 
 		if (response.errorCode != null) {
 			throw PlaybackException().apply {

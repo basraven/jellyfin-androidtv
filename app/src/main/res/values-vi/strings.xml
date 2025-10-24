@@ -196,7 +196,7 @@
     <string name="lbl_prev_item">Mục trước</string>
     <string name="lbl_next_item">Mục kế tiếp</string>
     <string name="lbl_open_album">Mở album</string>
-    <string name="lbl_open_artist">Mở Nghệ Sĩ</string>
+    <string name="lbl_open_artist">Mở nghệ sĩ</string>
     <string name="lbl_add_to_queue">Thêm vào hàng đợi</string>
     <string name="msg_items_added">" đã thêm các mục"</string>
     <string name="lbl_runs">Chạy</string>
@@ -207,8 +207,8 @@
     <string name="subtitle_error">Không thể chọn phụ đề</string>
     <string name="too_many_errors">Có quá nhiều lỗi. Từ bỏ</string>
     <string name="player_error">Đã gặp lỗi trình phát. Sẽ thử lại…</string>
-    <string name="msg_live_tv_prev">Tải %1$d giờ trước đó\?</string>
-    <string name="msg_live_tv_next">Tải %1$d giờ tiếp theo\?</string>
+    <string name="msg_live_tv_prev">Tải về trước %1$d giờ?</string>
+    <string name="msg_live_tv_next">Tải kế tiếp %1$d giờ?</string>
     <string name="lbl_load_guide_data">Tải dữ liệu hướng dẫn</string>
     <string name="episode_missing_message_2">Tập này bị thiếu trong thư viện của bạn. Phát lại sẽ dừng.</string>
     <string name="episode_missing_message">Tập này bị thiếu trong thư viện của bạn. Bạn có muốn bỏ qua nó và tiếp tục phần tiếp theo không\?</string>
@@ -557,4 +557,27 @@
     <string name="runtime_hours_minutes">%1$dh %2$dm</string>
     <string name="runtime_minutes">%1$dm</string>
     <string name="lbl_videos">Videos</string>
+    <string name="image_type_poster">Áp phích</string>
+    <string name="lbl_runtime">Thời lượng</string>
+    <plurals name="tracks">
+        <item quantity="other">%1$s bài</item>
+    </plurals>
+    <string name="indicator_subtitles_hearing_impaired">SDH</string>
+    <string name="fast_forward">Về trước nhanh</string>
+    <string name="rewind">Tua lại</string>
+    <string name="preference_enable_libass">Bật máy khách phụ đề Advanced SubStation Alpha</string>
+    <string name="lbl_from_beginning">Phát từ đầu</string>
+    <string name="speech_error_no_permission">Không có quyền sử dụng micrô. Vui lòng kích hoạt nó trong cài đặt hệ thống.</string>
+    <string name="speech_error_unavailable">Nhận dạng giọng nói không có sẵn trên thiết bị của bạn.</string>
+    <string name="speech_error_unknown">Một lỗi bất ngờ xảy ra trong quá trình nhận dạng giọng nói.</string>
+    <string name="pref_subtitles_bold">Chữ đậm</string>
+    <string name="preference_enable_pgs">Trực tiếp phát phụ đề PGS</string>
+    <string name="lbl_exit">Thoát</string>
+    <string name="pref_still_watching_behavior_title">Hiển thị cửa sổ bật lên thời gian chờ không hoạt động</string>
+    <string name="lbl_still_watching_default">3 tập hoặc 90 phút</string>
+    <string name="lbl_still_watching_short">2 tập hoặc 60 phút</string>
+    <string name="lbl_still_watching_long">5 tập hoặc 150 phút</string>
+    <string name="lbl_still_watching_very_long">8 tập hoặc 240 phút</string>
+    <string name="still_watching_label">Bạn vẫn đang xem?</string>
+    <string name="pref_subtitles_position">Bù từ dưới cùng</string>
 </resources>

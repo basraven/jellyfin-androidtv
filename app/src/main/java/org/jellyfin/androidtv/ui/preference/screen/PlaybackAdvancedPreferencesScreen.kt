@@ -3,7 +3,9 @@ package org.jellyfin.androidtv.ui.preference.screen
 import android.os.Build
 import android.widget.Toast
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.getQualityProfiles
 import org.jellyfin.androidtv.preference.UserPreferences
@@ -21,6 +23,7 @@ import org.jellyfin.androidtv.util.TimeUtils
 import org.jellyfin.androidtv.util.profile.createDeviceProfileReport
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.clientLogApi
+import org.koin.android.ext.android.get
 import org.koin.android.ext.android.inject
 import timber.log.Timber
 
@@ -95,6 +98,11 @@ class PlaybackAdvancedPreferencesScreen : OptionsFragment() {
 			}
 
 			checkbox {
+				setTitle(R.string.preference_enable_pgs)
+				bind(userPreferences, UserPreferences.pgsDirectPlay)
+			}
+
+			checkbox {
 				setTitle(R.string.pref_external_player)
 				bind(userPreferences, UserPreferences.useExternalPlayer)
 			}
@@ -141,7 +149,9 @@ class PlaybackAdvancedPreferencesScreen : OptionsFragment() {
 
 					lifecycleScope.launch {
 						runCatching {
-							api.clientLogApi.logFile(createDeviceProfileReport(context, userPreferences)).content
+							withContext(Dispatchers.IO) {
+								api.clientLogApi.logFile(createDeviceProfileReport(context, userPreferences, get())).content
+							}
 						}.fold(
 							onSuccess = { result ->
 								Toast.makeText(

@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.ui.playback;
 
+import static org.koin.java.KoinJavaComponent.get;
 import static org.koin.java.KoinJavaComponent.inject;
 
 import android.annotation.TargetApi;
@@ -21,7 +22,9 @@ import org.jellyfin.androidtv.preference.UserPreferences;
 import org.jellyfin.androidtv.preference.UserSettingPreferences;
 import org.jellyfin.androidtv.preference.constant.NextUpBehavior;
 import org.jellyfin.androidtv.preference.constant.RefreshRateSwitchingBehavior;
+import org.jellyfin.androidtv.preference.constant.StillWatchingBehavior;
 import org.jellyfin.androidtv.preference.constant.ZoomMode;
+import org.jellyfin.androidtv.ui.InteractionTrackerViewModel;
 import org.jellyfin.androidtv.ui.livetv.TvManager;
 import org.jellyfin.androidtv.util.TimeUtils;
 import org.jellyfin.androidtv.util.Utils;
@@ -29,6 +32,8 @@ import org.jellyfin.androidtv.util.apiclient.ReportingHelper;
 import org.jellyfin.androidtv.util.apiclient.Response;
 import org.jellyfin.androidtv.util.profile.DeviceProfileKt;
 import org.jellyfin.androidtv.util.sdk.compat.JavaCompat;
+import org.jellyfin.sdk.api.client.ApiClient;
+import org.jellyfin.sdk.model.ServerVersion;
 import org.jellyfin.sdk.model.api.BaseItemDto;
 import org.jellyfin.sdk.model.api.BaseItemKind;
 import org.jellyfin.sdk.model.api.DeviceProfile;
@@ -41,6 +46,7 @@ import org.jellyfin.sdk.model.api.SubtitleDeliveryMethod;
 import org.jellyfin.sdk.model.serializer.UUIDSerializerKt;
 import org.koin.java.KoinJavaComponent;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -48,8 +54,6 @@ import java.util.List;
 
 import kotlin.Lazy;
 import timber.log.Timber;
-
-import java.time.Duration;
 
 public class PlaybackController implements PlaybackControllerNotifiable {
     // Frequency to report playback progress
@@ -60,17 +64,21 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     private Lazy<PlaybackManager> playbackManager = inject(PlaybackManager.class);
     private Lazy<UserPreferences> userPreferences = inject(UserPreferences.class);
     private Lazy<VideoQueueManager> videoQueueManager = inject(VideoQueueManager.class);
-    private Lazy<org.jellyfin.sdk.api.client.ApiClient> api = inject(org.jellyfin.sdk.api.client.ApiClient.class);
+    private Lazy<ApiClient> api = inject(ApiClient.class);
     private Lazy<DataRefreshService> dataRefreshService = inject(DataRefreshService.class);
     private Lazy<ReportingHelper> reportingHelper = inject(ReportingHelper.class);
+    private final Lazy<InteractionTrackerViewModel> lazyInteractionTracker = inject(InteractionTrackerViewModel.class);
 
     List<BaseItemDto> mItems;
     VideoManager mVideoManager;
     int mCurrentIndex;
+    int mLastIndex;
     protected long mCurrentPosition = 0;
     private PlaybackState mPlaybackState = PlaybackState.IDLE;
 
     private StreamInfo mCurrentStreamInfo;
+
+    private final InteractionTrackerViewModel interactionTracker;
 
     @Nullable
     private CustomPlaybackOverlayFragment mFragment;
@@ -115,6 +123,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         mFragment = fragment;
         mHandler = new Handler();
 
+        interactionTracker = lazyInteractionTracker.getValue();
 
         refreshRateSwitchingBehavior = userPreferences.getValue().get(UserPreferences.Companion.getRefreshRateSwitchingBehavior());
         if (refreshRateSwitchingBehavior != RefreshRateSwitchingBehavior.DISABLED)
@@ -168,12 +177,12 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         return mVideoManager != null && mVideoManager.isInitialized();
     }
 
-    public org.jellyfin.sdk.model.api.MediaSourceInfo getCurrentMediaSource() {
+    public MediaSourceInfo getCurrentMediaSource() {
         if (mCurrentStreamInfo != null && mCurrentStreamInfo.getMediaSource() != null) {
             return mCurrentStreamInfo.getMediaSource();
         } else {
             BaseItemDto item = getCurrentlyPlayingItem();
-            List<org.jellyfin.sdk.model.api.MediaSourceInfo> mediaSources = item.getMediaSources();
+            List<MediaSourceInfo> mediaSources = item.getMediaSources();
 
             if (mediaSources == null || mediaSources.isEmpty()) {
                 return null;
@@ -324,7 +333,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     @TargetApi(23)
-    private void setRefreshRate(org.jellyfin.sdk.model.api.MediaStream videoStream) {
+    private void setRefreshRate(MediaStream videoStream) {
         if (videoStream == null || mFragment == null) {
             Timber.e("Null video stream attempting to set refresh rate");
             return;
@@ -385,7 +394,8 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     protected void play(long position, @Nullable Integer forcedSubtitleIndex) {
-        Timber.i("Play called from state: %s with pos: %d and sub index: %d", mPlaybackState, position, forcedSubtitleIndex);
+        String forcedAudioLanguage = videoQueueManager.getValue().getLastPlayedAudioLanguageIsoCode();
+        Timber.i("Play called from state: %s with pos: %d, sub index: %d and forced audio: %s", mPlaybackState, position, forcedSubtitleIndex, forcedAudioLanguage);
 
         if (mFragment == null) {
             Timber.w("mFragment is null, returning");
@@ -407,7 +417,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 }
                 // just resume
                 mVideoManager.play();
-                mPlaybackState = PlaybackState.PLAYING; //won't get another onprepared call
+                mPlaybackState = PlaybackState.PLAYING; // won't get another onPrepared call
                 mFragment.setFadingEnabled(true);
                 startReportLoop();
                 break;
@@ -474,7 +484,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 // undo setting mSeekPosition for liveTV
                 if (isLiveTv) mSeekPosition = -1;
 
-                VideoOptions internalOptions = buildExoPlayerOptions(forcedSubtitleIndex, item);
+                VideoOptions internalOptions = buildExoPlayerOptions(forcedSubtitleIndex, forcedAudioLanguage, item);
 
                 playInternal(getCurrentlyPlayingItem(), position, internalOptions);
                 mPlaybackState = PlaybackState.BUFFERING;
@@ -490,12 +500,15 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     @NonNull
-    private VideoOptions buildExoPlayerOptions(@Nullable Integer forcedSubtitleIndex, BaseItemDto item) {
+    private VideoOptions buildExoPlayerOptions(
+            @Nullable Integer forcedSubtitleIndex,
+            @Nullable String forcedAudioLanguage,
+            BaseItemDto item) {
         VideoOptions internalOptions = new VideoOptions();
         internalOptions.setItemId(item.getId());
         internalOptions.setMediaSources(item.getMediaSources());
-        if (playbackRetries > 0 || (isLiveTv && !directStreamLiveTv)) internalOptions.setEnableDirectStream(false);
-        if (playbackRetries > 1) internalOptions.setEnableDirectPlay(false);
+        if (playbackRetries > 0 || (isLiveTv && !directStreamLiveTv)) internalOptions.setEnableDirectPlay(false);
+        if (playbackRetries > 1) internalOptions.setEnableDirectStream(false);
         if (mCurrentOptions != null) {
             internalOptions.setSubtitleStreamIndex(mCurrentOptions.getSubtitleStreamIndex());
             internalOptions.setAudioStreamIndex(mCurrentOptions.getAudioStreamIndex());
@@ -504,12 +517,22 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             internalOptions.setSubtitleStreamIndex(forcedSubtitleIndex);
         }
         MediaSourceInfo currentMediaSource = getCurrentMediaSource();
+        if (forcedAudioLanguage != null) {
+            // find the first audio stream with the requested language
+            for (MediaStream stream : currentMediaSource.getMediaStreams()) {
+                if (stream.getType() == MediaStreamType.AUDIO && forcedAudioLanguage.equals(stream.getLanguage())) {
+                    internalOptions.setAudioStreamIndex(stream.getIndex());
+                    break;
+                }
+            }
+        }
         if (!isLiveTv && currentMediaSource != null) {
             internalOptions.setMediaSourceId(currentMediaSource.getId());
         }
         DeviceProfile internalProfile = DeviceProfileKt.createDeviceProfile(
+                mFragment.getContext(),
                 userPreferences.getValue(),
-                !internalOptions.getEnableDirectStream()
+                get(ServerVersion.class)
         );
         internalOptions.setProfile(internalProfile);
         return internalOptions;
@@ -521,9 +544,10 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             TvManager.setLastLiveTvChannel(item.getId());
             //internal/exo player
             Timber.i("Using internal player for Live TV");
-            playbackManager.getValue().getVideoStreamInfo(mFragment, internalOptions, position * 10000, new Response<StreamInfo>() {
+            playbackManager.getValue().getVideoStreamInfo(mFragment, internalOptions, position * 10000, new Response<StreamInfo>(mFragment.getLifecycle()) {
                 @Override
                 public void onResponse(StreamInfo response) {
+                    if (!isActive()) return;
                     if (mVideoManager == null)
                         return;
                     mCurrentOptions = internalOptions;
@@ -532,13 +556,15 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
                 @Override
                 public void onError(Exception exception) {
+                    if (!isActive()) return;
                     handlePlaybackInfoError(exception);
                 }
             });
         } else {
-            playbackManager.getValue().getVideoStreamInfo(mFragment, internalOptions, position * 10000, new Response<StreamInfo>() {
+            playbackManager.getValue().getVideoStreamInfo(mFragment, internalOptions, position * 10000, new Response<StreamInfo>(mFragment.getLifecycle()) {
                 @Override
                 public void onResponse(StreamInfo internalResponse) {
+                    if (!isActive()) return;
                     Timber.i("Internal player would %s", internalResponse.getPlayMethod().equals(PlayMethod.TRANSCODE) ? "transcode" : "direct stream");
                     if (mVideoManager == null)
                         return;
@@ -549,6 +575,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
                 @Override
                 public void onError(Exception exception) {
+                    if (!isActive()) return;
                     Timber.e(exception, "Unable to get stream info for internal player");
                     if (mVideoManager == null)
                         return;
@@ -583,6 +610,12 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if (!hasInitializedVideoManager() || !hasFragment()) {
             Timber.d("Error - attempting to play without:%s%s", hasInitializedVideoManager() ? "" : " [videoManager]", hasFragment() ? "" : " [overlay fragment]");
             return;
+        }
+
+        if (mCurrentIndex != mLastIndex) {
+            clearPlaybackSessionOptions();
+            mCurrentOptions.setAudioStreamIndex(null);
+            mLastIndex = mCurrentIndex;
         }
 
         mStartPosition = position;
@@ -669,7 +702,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         } else if (isTranscoding() && getCurrentMediaSource().getDefaultAudioStreamIndex() != null) {
             currIndex = getCurrentMediaSource().getDefaultAudioStreamIndex();
         } else if (hasInitializedVideoManager() && !isTranscoding()) {
-            currIndex = mVideoManager.getExoPlayerTrack(org.jellyfin.sdk.model.api.MediaStreamType.AUDIO, getCurrentlyPlayingItem().getMediaStreams());
+            currIndex = mVideoManager.getExoPlayerTrack(MediaStreamType.AUDIO, getCurrentlyPlayingItem().getMediaStreams());
         }
         return currIndex;
     }
@@ -679,11 +712,30 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             return null;
 
         boolean videoFound = false;
-        for (org.jellyfin.sdk.model.api.MediaStream track : info.getMediaStreams()) {
-            if (track.getType() == org.jellyfin.sdk.model.api.MediaStreamType.VIDEO) {
+        for (MediaStream track : info.getMediaStreams()) {
+            if (track.getType() == MediaStreamType.VIDEO) {
                 videoFound = true;
             } else {
-                if (videoFound && track.getType() == org.jellyfin.sdk.model.api.MediaStreamType.AUDIO)
+                if (videoFound && track.getType() == MediaStreamType.AUDIO)
+                    return track.getIndex();
+            }
+        }
+        return null;
+    }
+
+    private Integer lastChosenLanguageAudioTrack(MediaSourceInfo info) {
+        if (info == null)
+            return null;
+
+        boolean videoFound = false;
+        for (MediaStream track : info.getMediaStreams()) {
+            if (track.getType() == MediaStreamType.VIDEO) {
+                videoFound = true;
+            } else {
+                if (videoFound
+                    && track.getType() == MediaStreamType.AUDIO
+                    && (track.getLanguage() != null && track.getLanguage().equals(videoQueueManager.getValue().getLastPlayedAudioLanguageIsoCode()))
+                )
                     return track.getIndex();
             }
         }
@@ -694,10 +746,13 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         if (mDefaultAudioIndex != -1)
             return;
 
+        Integer lastChosenLanguage = lastChosenLanguageAudioTrack(info.getMediaSource());
         Integer remoteDefault = info.getMediaSource().getDefaultAudioStreamIndex();
         Integer bestGuess = bestGuessAudioTrack(info.getMediaSource());
 
-        if (remoteDefault != null)
+        if (lastChosenLanguage != null)
+            mDefaultAudioIndex = lastChosenLanguage;
+        else if (remoteDefault != null)
             mDefaultAudioIndex = remoteDefault;
         else if (bestGuess != null)
             mDefaultAudioIndex = bestGuess;
@@ -707,6 +762,23 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     public void switchAudioStream(int index) {
         if (!(isPlaying() || isPaused()) || index < 0)
             return;
+
+        BaseItemDto currentItem = getCurrentlyPlayingItem();
+        if (currentItem == null
+                || currentItem.getMediaStreams() == null
+                || index >= currentItem.getMediaStreams().size()) {
+            return;
+        }
+
+        String lastAudioIsoCode = videoQueueManager.getValue().getLastPlayedAudioLanguageIsoCode();
+        String currentAudioIsoCode = currentItem.getMediaStreams().get(index).getLanguage();
+
+        if (currentAudioIsoCode != null
+                && (lastAudioIsoCode == null || !lastAudioIsoCode.equals(currentAudioIsoCode))) {
+            videoQueueManager.getValue().setLastPlayedAudioLanguageIsoCode(
+                    currentAudioIsoCode
+            );
+        }
 
         int currAudioIndex = getAudioStreamIndex();
         Timber.d("trying to switch audio stream from %s to %s", currAudioIndex, index);
@@ -793,7 +865,9 @@ public class PlaybackController implements PlaybackControllerNotifiable {
     }
 
     public void endPlayback(Boolean closeActivity) {
-        if (closeActivity && mFragment != null) mFragment.closePlayer();
+        if (closeActivity && mFragment != null) {
+            mFragment.closePlayer();
+        }
         stop();
         if (mVideoManager != null)
             mVideoManager.destroy();
@@ -906,9 +980,10 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             mVideoManager.stopPlayback();
             mPlaybackState = PlaybackState.BUFFERING;
 
-            playbackManager.getValue().changeVideoStream(mFragment, mCurrentStreamInfo, mCurrentOptions, pos * 10000, new Response<StreamInfo>() {
+            playbackManager.getValue().changeVideoStream(mFragment, mCurrentStreamInfo, mCurrentOptions, pos * 10000, new Response<StreamInfo>(mFragment.getLifecycle()) {
                 @Override
                 public void onResponse(StreamInfo response) {
+                    if (!isActive()) return;
                     mCurrentStreamInfo = response;
                     if (mVideoManager != null) {
                         mVideoManager.setMediaStreamInfo(api.getValue(), response);
@@ -918,6 +993,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
                 @Override
                 public void onError(Exception exception) {
+                    if (!isActive()) return;
                     if (mFragment != null)
                         Utils.showToast(mFragment.getContext(), R.string.msg_video_playback_error);
                     Timber.e(exception, "Error trying to seek transcoded stream");
@@ -1085,14 +1161,22 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         }
 
         Timber.d("Moving to next queue item. Index: %s", (mCurrentIndex + 1));
-        if (userPreferences.getValue().get(UserPreferences.Companion.getNextUpBehavior()) != NextUpBehavior.DISABLED
-                && curItem.getType() != BaseItemKind.TRAILER) {
+        boolean stillWatchingEnabled = userPreferences.getValue().get(UserPreferences.Companion.getStillWatchingBehavior()) != StillWatchingBehavior.DISABLED;
+        boolean nextUpEnabled = userPreferences.getValue().get(UserPreferences.Companion.getNextUpBehavior()) != NextUpBehavior.DISABLED;
+        if ((stillWatchingEnabled || nextUpEnabled) && curItem.getType() != BaseItemKind.TRAILER) {
             mCurrentIndex++;
             videoQueueManager.getValue().setCurrentMediaPosition(mCurrentIndex);
             spinnerOff = false;
 
-            // Show "Next Up" fragment
-            if (mFragment != null) mFragment.showNextUp(nextItem.getId());
+            if (mFragment != null) {
+                if (stillWatchingEnabled && interactionTracker.getShowStillWatching()) {
+                    // Show "Still Watching" fragment
+                    mFragment.showStillWatching(nextItem.getId());
+                } else if (nextUpEnabled) {
+                    // Show "Next Up" fragment
+                    mFragment.showNextUp(nextItem.getId());
+                }
+            }
             endPlayback();
         } else {
             next();
@@ -1113,6 +1197,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             }
 
             mPlaybackState = PlaybackState.PLAYING;
+            interactionTracker.notifyStart(getCurrentlyPlayingItem());
             mCurrentTranscodeStartTime = mCurrentStreamInfo.getPlayMethod() == PlayMethod.TRANSCODE ? Instant.now().toEpochMilli() : 0;
             startReportLoop();
         }
@@ -1127,6 +1212,8 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 Integer currentSubtitleIndex = mCurrentOptions.getSubtitleStreamIndex();
                 if (currentSubtitleIndex == null) currentSubtitleIndex = -1;
                 PlaybackControllerHelperKt.setSubtitleIndex(this, currentSubtitleIndex, true);
+            } else {
+                PlaybackControllerHelperKt.disableDefaultSubtitles(this);
             }
 
             // select an audio track
@@ -1162,6 +1249,7 @@ public class PlaybackController implements PlaybackControllerNotifiable {
 
     @Override
     public void onCompletion() {
+        interactionTracker.onEpisodeWatched();
         Timber.d("On Completion fired");
         itemComplete();
     }

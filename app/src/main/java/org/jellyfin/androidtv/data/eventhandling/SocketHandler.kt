@@ -4,10 +4,14 @@ import android.content.Context
 import android.media.AudioManager
 import android.os.Build
 import android.widget.Toast
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.coroutineScope
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.data.model.DataRefreshService
@@ -50,103 +54,109 @@ class SocketHandler(
 	private val audioManager: AudioManager,
 	private val itemLauncher: ItemLauncher,
 	private val playbackHelper: PlaybackHelper,
+	private val lifecycle: Lifecycle,
 ) {
-	private val coroutineScope = CoroutineScope(Dispatchers.IO)
-
-	suspend fun updateSession() {
-		try {
-			api.sessionApi.postCapabilities(
-				playableMediaTypes = listOf(MediaType.VIDEO, MediaType.AUDIO),
-				supportsMediaControl = true,
-				supportedCommands = buildList {
-					add(GeneralCommandType.DISPLAY_CONTENT)
-					add(GeneralCommandType.SET_SUBTITLE_STREAM_INDEX)
-					add(GeneralCommandType.SET_AUDIO_STREAM_INDEX)
-
-					add(GeneralCommandType.DISPLAY_MESSAGE)
-					add(GeneralCommandType.SEND_STRING)
-
-					// Note: These are used in the PlaySessionSocketService
-					if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !audioManager.isVolumeFixed) {
-						add(GeneralCommandType.VOLUME_UP)
-						add(GeneralCommandType.VOLUME_DOWN)
-						add(GeneralCommandType.SET_VOLUME)
-
-						add(GeneralCommandType.MUTE)
-						add(GeneralCommandType.UNMUTE)
-						add(GeneralCommandType.TOGGLE_MUTE)
-					}
-				},
-			)
-		} catch (err: ApiClientException) {
-			Timber.e(err, "Unable to update capabilities")
-			return
+	init {
+		lifecycle.coroutineScope.launch(Dispatchers.IO) {
+			lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+				subscribe(this)
+			}
 		}
 	}
 
-	init {
-		api.webSocket.apply {
-			// Library
-			subscribe<LibraryChangedMessage>()
-				.onEach { message -> message.data?.let(::onLibraryChanged) }
-				.launchIn(coroutineScope)
+	suspend fun updateSession() {
+		try {
+			withContext(Dispatchers.IO) {
+				api.sessionApi.postCapabilities(
+					playableMediaTypes = listOf(MediaType.VIDEO, MediaType.AUDIO),
+					supportsMediaControl = true,
+					supportedCommands = buildList {
+						add(GeneralCommandType.DISPLAY_CONTENT)
+						add(GeneralCommandType.SET_SUBTITLE_STREAM_INDEX)
+						add(GeneralCommandType.SET_AUDIO_STREAM_INDEX)
 
-			// Media playback
-			subscribe<PlayMessage>()
-				.onEach { message -> onPlayMessage(message) }
-				.launchIn(coroutineScope)
+						add(GeneralCommandType.DISPLAY_MESSAGE)
+						add(GeneralCommandType.SEND_STRING)
 
-			subscribe<PlaystateMessage>()
-				.onEach { message -> onPlayStateMessage(message) }
-				.launchIn(coroutineScope)
+						// Note: These are used in the PlaySessionSocketService
+						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !audioManager.isVolumeFixed) {
+							add(GeneralCommandType.VOLUME_UP)
+							add(GeneralCommandType.VOLUME_DOWN)
+							add(GeneralCommandType.SET_VOLUME)
 
-			subscribeGeneralCommand(GeneralCommandType.SET_SUBTITLE_STREAM_INDEX)
-				.onEach { message ->
-					val index = message["index"]?.toIntOrNull() ?: return@onEach
-
-					withContext(Dispatchers.Main) {
-						playbackControllerContainer.playbackController?.setSubtitleIndex(index)
-					}
-				}
-				.launchIn(coroutineScope)
-
-			subscribeGeneralCommand(GeneralCommandType.SET_AUDIO_STREAM_INDEX)
-				.onEach { message ->
-					val index = message["index"]?.toIntOrNull() ?: return@onEach
-
-					withContext(Dispatchers.Main) {
-						playbackControllerContainer.playbackController?.switchAudioStream(index)
-					}
-				}
-				.launchIn(coroutineScope)
-
-			// General commands
-			subscribeGeneralCommand(GeneralCommandType.DISPLAY_CONTENT)
-				.onEach { message ->
-					val itemId by message
-					val itemType by message
-
-					val itemUuid = itemId?.toUUIDOrNull()
-					val itemKind = itemType?.let { type ->
-						BaseItemKind.entries.find { value ->
-							value.serialName.equals(type, true)
+							add(GeneralCommandType.MUTE)
+							add(GeneralCommandType.UNMUTE)
+							add(GeneralCommandType.TOGGLE_MUTE)
 						}
-					}
-
-					if (itemUuid != null && itemKind != null) onDisplayContent(itemUuid, itemKind)
-				}
-				.launchIn(coroutineScope)
-
-			subscribeGeneralCommands(setOf(GeneralCommandType.DISPLAY_MESSAGE, GeneralCommandType.SEND_STRING))
-				.onEach { message ->
-					val header by message
-					val text by message
-					val string by message
-
-					onDisplayMessage(header, text ?: string)
-				}
-				.launchIn(coroutineScope)
+					},
+				)
+			}
+		} catch (err: ApiClientException) {
+			Timber.e(err, "Unable to update capabilities")
 		}
+	}
+
+	private fun subscribe(coroutineScope: CoroutineScope) = api.webSocket.apply {
+		// Library
+		subscribe<LibraryChangedMessage>()
+			.onEach { message -> message.data?.let(::onLibraryChanged) }
+			.launchIn(coroutineScope)
+
+		// Media playback
+		subscribe<PlayMessage>()
+			.onEach { message -> onPlayMessage(message) }
+			.launchIn(coroutineScope)
+
+		subscribe<PlaystateMessage>()
+			.onEach { message -> onPlayStateMessage(message) }
+			.launchIn(coroutineScope)
+
+		subscribeGeneralCommand(GeneralCommandType.SET_SUBTITLE_STREAM_INDEX)
+			.onEach { message ->
+				val index = message["index"]?.toIntOrNull() ?: return@onEach
+
+				withContext(Dispatchers.Main) {
+					playbackControllerContainer.playbackController?.setSubtitleIndex(index)
+				}
+			}
+			.launchIn(coroutineScope)
+
+		subscribeGeneralCommand(GeneralCommandType.SET_AUDIO_STREAM_INDEX)
+			.onEach { message ->
+				val index = message["index"]?.toIntOrNull() ?: return@onEach
+
+				withContext(Dispatchers.Main) {
+					playbackControllerContainer.playbackController?.switchAudioStream(index)
+				}
+			}
+			.launchIn(coroutineScope)
+
+		// General commands
+		subscribeGeneralCommand(GeneralCommandType.DISPLAY_CONTENT)
+			.onEach { message ->
+				val itemId by message
+				val itemType by message
+
+				val itemUuid = itemId?.toUUIDOrNull()
+				val itemKind = itemType?.let { type ->
+					BaseItemKind.entries.find { value ->
+						value.serialName.equals(type, true)
+					}
+				}
+
+				if (itemUuid != null && itemKind != null) onDisplayContent(itemUuid, itemKind)
+			}
+			.launchIn(coroutineScope)
+
+		subscribeGeneralCommands(setOf(GeneralCommandType.DISPLAY_MESSAGE, GeneralCommandType.SEND_STRING))
+			.onEach { message ->
+				val header by message
+				val text by message
+				val string by message
+
+				onDisplayMessage(header, text ?: string)
+			}
+			.launchIn(coroutineScope)
 	}
 
 	private fun onLibraryChanged(info: LibraryUpdateInfo) {
